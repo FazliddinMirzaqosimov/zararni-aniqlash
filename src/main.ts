@@ -7,6 +7,7 @@ import router from './router'
 import './assets/styles.scss'
 import ConfirmationService from 'primevue/confirmationservice';
 import ToastService from 'primevue/toastservice';
+import 'leaflet/dist/leaflet.css'
 
 
 const app = createApp(App)
