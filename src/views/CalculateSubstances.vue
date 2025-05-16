@@ -169,6 +169,9 @@
         </div>
       </Transition>
 
+      <div class="mt-10">
+        <canvas id="pollutionChart" width="400" height="200"></canvas>
+      </div>
       <!-- Hisoblash tarixi -->
       <div
         v-if="calculationHistory.length > 0"
@@ -254,7 +257,83 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import {
+  Chart,
+  LineController,
+  LineElement,
+  PointElement,
+  LinearScale,
+  Title,
+  CategoryScale,
+} from 'chart.js'
+
+Chart.register(LineController, LineElement, PointElement, LinearScale, Title, CategoryScale)
+
+const chartRef = ref<Chart | null>(null)
+
+function calculatePollutionConcentration(t: number, input: any, coeff: any): number {
+  const { C0, T, H, P, v } = input
+  const { alpha, beta, gamma, delta } = coeff
+  const C =
+    C0 *
+    Math.exp(-alpha * v * t) *
+    Math.exp(-beta * T * t) *
+    Math.exp(-gamma * H * t) *
+    Math.exp(-delta * P * t)
+  return parseFloat(C.toFixed(4))
+}
+
+function renderChart() {
+  const times = Array.from({ length: 20 }, (_, i) => i + 1) // t = 1 to 20
+  const concentrations = times.map((t) =>
+    calculatePollutionConcentration(t, input.value, coeff.value),
+  )
+
+  const ctx = document.getElementById('pollutionChart') as HTMLCanvasElement
+  if (!ctx) return
+
+  if (chartRef.value) chartRef.value.destroy()
+
+  chartRef.value = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: times,
+      datasets: [
+        {
+          label: 'C(t) - Ifloslanish konsentratsiyasi',
+          data: concentrations,
+          fill: false,
+          borderColor: 'rgb(59,130,246)', // Tailwind blue-500
+          tension: 0.1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Vaqtga nisbatan C(t) grafigi',
+        },
+      },
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'C(t) [mg/l]',
+          },
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Vaqt (t)',
+          },
+        },
+      },
+    },
+  })
+}
 
 interface CalculationResult {
   id: number
@@ -288,28 +367,26 @@ const calculationHistory = ref<CalculationResult[]>([])
 
 function calculateC() {
   loading.value = true
-  setTimeout(() => {
-    const { C0, T, H, P, v } = input.value
-    const { alpha, beta, gamma, delta } = coeff.value
-    const numerator = 1 + beta * T + gamma * H + delta * P
-    const denominator = Math.exp(-alpha * v)
-    const calculatedResult = parseFloat(((C0 * denominator) / numerator).toFixed(4))
-    result.value = calculatedResult
+  const { C0, T, H, P, v } = input.value
+  const { alpha, beta, gamma, delta } = coeff.value
+  const numerator = 1 + beta * T + gamma * H + delta * P
+  const denominator = Math.exp(-alpha * v)
+  const calculatedResult = parseFloat(((C0 * denominator) / numerator).toFixed(4))
+  result.value = calculatedResult
 
-    // Add to history
-    calculationHistory.value.push({
-      id: Date.now(),
-      timestamp: new Date().toLocaleString('uz-UZ'),
-      C0,
-      T,
-      H,
-      P,
-      v,
-      result: calculatedResult,
-    })
-
-    loading.value = false
-  }, 800)
+  // Add to history
+  calculationHistory.value.push({
+    id: Date.now(),
+    timestamp: new Date().toLocaleString('uz-UZ'),
+    C0,
+    T,
+    H,
+    P,
+    v,
+    result: calculatedResult,
+  })
+  renderChart()
+  loading.value = false
 }
 
 function deleteHistoryItem(id: number) {
